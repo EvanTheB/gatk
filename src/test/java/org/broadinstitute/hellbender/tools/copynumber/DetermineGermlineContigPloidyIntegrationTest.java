@@ -105,31 +105,31 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     );
 
     private static final List<File> SFARI_COUNT_FILES = Arrays.asList(
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00089.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00090.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00091.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00092.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00115.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00117.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00118.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00119.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00137.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00138.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00139.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00140.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00255.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00256.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00259.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00314.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00318.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00320.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00469.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00472.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00473.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00517.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00519.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00520.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00521.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00089.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00090.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00091.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00092.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00115.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00117.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00118.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00119.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00137.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00138.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00139.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00140.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00255.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00256.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00259.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00314.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00318.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00320.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00469.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00472.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00473.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00517.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00519.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00520.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00521.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00534.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00535.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00536.counts.hdf5"),
@@ -291,7 +291,6 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                 .addArgument(StandardArgumentDefinitions.INTERVALS_LONG_NAME, "/home/slee/working/gatk/test_files/NimbleGenEZ2Tiled_hg19_v2.preprocessed.mapp_gt_0.99.interval_list")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-sfari-cohort")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "500")
-                .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.1")
                 .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "COHORT")
                 .addArgument(IntervalArgumentCollection.INTERVAL_MERGING_RULE_LONG_NAME, IntervalMergingRule.OVERLAPPING_ONLY.toString())
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
@@ -306,8 +305,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
                 .addArgument(StandardArgumentDefinitions.INTERVALS_LONG_NAME, "/home/slee/working/gatk/test_files/NimbleGenEZ2Tiled_hg19_v2.preprocessed.mapp_gt_0.99.interval_list")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-sfari-cohort-full")
-                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "500")
-                .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.1")
+                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
                 .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "COHORT")
                 .addArgument(IntervalArgumentCollection.INTERVAL_MERGING_RULE_LONG_NAME, IntervalMergingRule.OVERLAPPING_ONLY.toString())
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");

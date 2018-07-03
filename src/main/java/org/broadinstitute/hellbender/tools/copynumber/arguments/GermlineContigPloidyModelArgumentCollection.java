@@ -23,10 +23,6 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
     public static final String CONTIG_BIAS_LOWER_BOUND_LONG_NAME = "contig-bias-lower-bound";
     public static final String CONTIG_BIAS_UPPER_BOUND_LONG_NAME = "contig-bias-upper-bound";
     public static final String CONTIG_BIAS_SCALE_LONG_NAME = "contig-bias-scale";
-    public static final String MOSAICISM_BIAS_LOWER_BOUND_LONG_NAME = "mosaicism-bias-lower-bound";
-    public static final String MOSAICISM_BIAS_UPPER_BOUND_LONG_NAME = "mosaicism-bias-upper-bound";
-    public static final String MOSAICISM_BIAS_SCALE_LONG_NAME = "mosaicism-bias-scale";
-    public static final String PSI_SCALE_LONG_NAME = "psi-scale";
 
     @Argument(
             doc = "Scale factor for the concentration parameters of the per-contig-set Dirichlet prior on ploidy states.  " +

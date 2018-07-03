@@ -116,6 +116,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                    for i in range(self.ploidy_workspace.num_contig_tuples)]
         d_s = np.mean(trace['d_s'], axis=0)
         b_j_norm = np.mean(trace['b_j_norm'], axis=0)
+        error_rate_js = np.mean(trace['error_rate_js'], axis=0)
         mu_j_sk = [np.mean(trace['mu_%d_sk' % j], axis=0)
                    for j in range(self.ploidy_workspace.num_contigs)]
 
@@ -134,7 +135,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             print('sample_{0}:'.format(s), np.argmax(q_ploidy_jl, axis=1))
         for s in range(self.ploidy_workspace.num_samples):
             l_j = np.argmax(q_ploidy_sjl[s], axis=1)
-            fig, axarr = plt.subplots(3, 1, figsize=(12, 10), gridspec_kw = {'height_ratios':[3, 1, 1]})
+            fig, axarr = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw = {'height_ratios':[3, 1]})
             for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples):
                 for contig in contig_tuple:
                     j = self.ploidy_workspace.contig_to_index_map[contig]
@@ -155,25 +156,19 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             k_j = [np.argmax(pi_i_sk[i][s])
                    for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples)
                    for j in range(len(contig_tuple))]
-            mu_j = [mu_j_sk[j][s, k_j[j]] for j in range(self.ploidy_workspace.num_contigs)]
+            mu_j = np.array([mu_j_sk[j][s, k_j[j]] for j in range(self.ploidy_workspace.num_contigs)])
 
             j = np.arange(self.ploidy_workspace.num_contigs)
 
+            axarr[1].errorbar(j, fit_mu_sj[s] / (d_s[s] * b_j_norm),
+                              yerr=fit_mu_sd_sj[s] / (d_s[s] * b_j_norm),
+                              c='g', fmt='o', elinewidth=2, alpha=0.5)
             axarr[1].scatter(j, l_j, c='r')
             axarr[1].set_xticks(j)
             axarr[1].set_xticklabels(self.ploidy_workspace.contigs)
             axarr[1].set_xlabel('contig', size=14)
             axarr[1].set_ylabel('ploidy', size=14)
             axarr[1].set_ylim([0, np.shape(q_ploidy_sjl)[2]])
-
-            axarr[2].axhline(1, c='k', ls='dashed')
-            axarr[2].errorbar(j, np.ones(self.ploidy_workspace.num_contigs), yerr=fit_mu_sd_sj[s] / fit_mu_sj[s], c='g', fmt='o', elinewidth=2, alpha=0.5)
-            axarr[2].scatter(j, mu_j / fit_mu_sj[s], c='r')
-            axarr[2].set_xticks(j)
-            axarr[2].set_xticklabels(self.ploidy_workspace.contigs)
-            axarr[2].set_xlabel('contig', size=14)
-            axarr[2].set_ylabel('mu fit', size=14)
-            axarr[2].set_ylim([0, 2])
 
             fig.tight_layout(pad=0.5)
             fig.savefig('/home/slee/working/gatk/test_files/plots/sample_{0}.png'.format(s))

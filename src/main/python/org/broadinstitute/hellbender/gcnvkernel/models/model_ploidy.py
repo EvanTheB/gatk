@@ -227,7 +227,7 @@ class PloidyWorkspace:
                       name='log_ploidy_emission_sjl', borrow=config.borrow_numpy)
 
         for s in range(self.num_samples):
-            fig, axarr = plt.subplots(3, 1, figsize=(12, 10), gridspec_kw = {'height_ratios':[3, 1, 1]})
+            fig, axarr = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw = {'height_ratios':[3, 1]})
             for i, contig_tuple in enumerate(self.contig_tuples):
                 for contig in contig_tuple:
                     j = self.contig_to_index_map[contig]
@@ -252,13 +252,6 @@ class PloidyWorkspace:
             axarr[1].set_xlabel('contig', size=14)
             axarr[1].set_ylabel('ploidy', size=14)
 
-            axarr[2].axhline(1, c='k', ls='dashed')
-            axarr[2].set_xticks(j)
-            axarr[2].set_xticklabels(self.contigs)
-            axarr[2].set_xlabel('contig', size=14)
-            axarr[2].set_ylabel('mu fit', size=14)
-            axarr[2].set_ylim([0, 2])
-
             fig.tight_layout(pad=0.5)
             fig.savefig('/home/slee/working/gatk/test_files/plots/sample_{0}.png'.format(s))
 
@@ -270,7 +263,7 @@ class PloidyWorkspace:
     def _construct_mask(hist_sjm):
         mask_sjm = np.full(np.shape(hist_sjm), True)
         mask_sjm[hist_sjm < 10] = False
-        mask_sjm[:, :, 0] = False
+        # mask_sjm[:, :, 1:20] = False
         return mask_sjm
 
     @staticmethod
@@ -279,10 +272,10 @@ class PloidyWorkspace:
         alpha_max = 1e5
         num_advi_iterations = 50000
         random_seed = 1
-        learning_rate = 0.1
+        learning_rate = 0.05
         abs_tolerance = 0.1
         num_logq_samples = 1000
-        batch_size_base = 16
+        batch_size_base = 32
 
         num_samples = hist_sjm.shape[0]
         num_contigs = hist_sjm.shape[1]
@@ -296,6 +289,11 @@ class PloidyWorkspace:
         hist_sjm_th = th.shared(hist_sjm)
         hist_mask_sjm_th = th.shared(hist_mask_sjm)
 
+        # fit_mu_sj_testval = np.sum(counts_m * hist_sjm, axis=-1) / np.sum(hist_sjm, axis=-1)
+        # fit_std_sj = np.sum((counts_m[np.newaxis, np.newaxis, :] - fit_mu_sj_testval[:, :, np.newaxis])**2 * hist_sjm,
+        #                     axis=-1) / np.sum(hist_sjm, axis=-1)
+        # fit_alpha_sj_testval = fit_mu_sj_testval**2 / (fit_std_sj**2 - fit_mu_sj_testval)
+
         # batch_size = batch_size_base * num_samples
         # hist_mask_indices = np.where(hist_mask_sjm)
         # hist_mask_indices_batched = pm.Minibatch(np.transpose(hist_mask_indices),
@@ -304,11 +302,13 @@ class PloidyWorkspace:
 
         with pm.Model() as model:
             fit_mu_sj = Uniform('fit_mu_sj',
-                            upper=num_counts,
-                            shape=(num_samples, num_contigs))
+                                upper=num_counts,
+                                shape=(num_samples, num_contigs))
+                                # testval=fit_mu_sj_testval)
             fit_alpha_sj = Uniform('fit_alpha_sj',
                                    upper=alpha_max,
                                    shape=(num_samples, num_contigs))
+                                   # testval=fit_alpha_sj_testval)
             # p_sjm = tt.exp(negative_binomial_logp(mu=fit_mu_sj.dimshuffle(0, 1, 'x') + eps,
             #                                       alpha=fit_alpha_sj.dimshuffle(0, 1, 'x'),
             #                                       value=counts_m[np.newaxis, np.newaxis, :],
@@ -521,9 +521,9 @@ def negative_binomial_logp(mu, alpha, value, mask=True):
     return bound(pm_dist_math.binomln(value + alpha - 1, value)
                  + pm_dist_math.logpow(mu / (mu + alpha), value)
                  + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
-                 mu > 0, value > 0, alpha > 0, mask)
+                 mu > 0, value >= 0, alpha > 0, mask)
 
 def poisson_logp(mu, value, mask=True):
-    log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu > 0, value > 0, mask)
+    log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu > 0, value >= 0, mask)
     # Return zero when mu and value are both zero
     return tt.switch(tt.eq(mu, 0) * tt.eq(value, 0), 0, log_prob)
