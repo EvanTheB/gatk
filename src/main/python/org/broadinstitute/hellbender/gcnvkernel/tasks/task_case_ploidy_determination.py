@@ -82,7 +82,7 @@ class CasePloidyInferenceTask(HybridInferenceTask):
                     j = self.ploidy_workspace.contig_to_index_map[contig]
                     hist_mask_m = np.logical_not(self.ploidy_workspace.hist_mask_sjm[s, j])
                     counts_m = self.ploidy_workspace.counts_m
-                    hist_norm_m = self.ploidy_workspace.hist_sjm_full[s, j] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j] * self.ploidy_workspace.hist_mask_sjm[s, j])
+                    hist_norm_m = self.ploidy_workspace.hist_sjm[s, j] / np.sum(self.ploidy_workspace.hist_sjm[s, j] * self.ploidy_workspace.hist_mask_sjm[s, j])
                     axarr[0].semilogy(counts_m, hist_norm_m, c='k', alpha=0.25)
                     axarr[0].semilogy(counts_m, np.ma.array(hist_norm_m, mask=hist_mask_m), c='b', alpha=0.5)
                     mu = fit_mu_sj[s, j]
@@ -90,7 +90,7 @@ class CasePloidyInferenceTask(HybridInferenceTask):
                     pdf_m = nbinom.pmf(k=counts_m, n=alpha, p=alpha / (mu + alpha))
                     axarr[0].semilogy(counts_m, np.ma.array(pdf_m, mask=hist_mask_m), c='g', lw=2)
                     axarr[0].set_xlim([0, self.ploidy_workspace.num_counts])
-            axarr[0].set_ylim([1 / np.max(np.sum(self.ploidy_workspace.hist_sjm_full[s] * self.ploidy_workspace.hist_mask_sjm[s], axis=-1)), 1E-1])
+            axarr[0].set_ylim([1 / np.max(np.sum(self.ploidy_workspace.hist_sjm[s] * self.ploidy_workspace.hist_mask_sjm[s], axis=-1)), 1E-1])
             axarr[0].set_xlabel('count', size=14)
             axarr[0].set_ylabel('density', size=14)
 

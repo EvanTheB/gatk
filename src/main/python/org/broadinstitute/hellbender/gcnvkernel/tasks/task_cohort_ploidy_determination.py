@@ -9,7 +9,7 @@ from .inference_task_base import Sampler, Caller, CallerUpdateSummary, \
     HybridInferenceTask, HybridInferenceParameters
 from .. import config, types
 from ..models.model_ploidy import PloidyModelConfig, PloidyModel, \
-    PloidyWorkspace, PloidyEmissionBasicSampler, PloidyBasicCaller
+    PloidyWorkspace, PloidyEmissionBasicSampler, PloidyBasicCaller, HistogramInferenceTask
 
 _logger = logging.getLogger(__name__)
 
@@ -91,6 +91,11 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                  hybrid_inference_params: HybridInferenceParameters,
                  ploidy_config: PloidyModelConfig,
                  ploidy_workspace: PloidyWorkspace):
+        _logger.info("Fitting histograms...")
+        histogram_task = HistogramInferenceTask(hybrid_inference_params, ploidy_config, ploidy_workspace)
+        histogram_task.engage()
+        histogram_task.disengage()
+
         _logger.info("Instantiating the germline contig ploidy determination model...")
         self.ploidy_model = PloidyModel(ploidy_config, ploidy_workspace)
 
@@ -116,9 +121,6 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                    for i in range(self.ploidy_workspace.num_contig_tuples)]
         d_s = np.mean(trace['d_s'], axis=0)
         b_j_norm = np.mean(trace['b_j_norm'], axis=0)
-        error_rate_js = np.mean(trace['error_rate_js'], axis=0)
-        mu_j_sk = [np.mean(trace['mu_%d_sk' % j], axis=0)
-                   for j in range(self.ploidy_workspace.num_contigs)]
 
         fit_mu_sj = self.ploidy_workspace.fit_mu_sj
         fit_mu_sd_sj = self.ploidy_workspace.fit_mu_sd_sj
@@ -141,7 +143,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                     j = self.ploidy_workspace.contig_to_index_map[contig]
                     hist_mask_m = np.logical_not(self.ploidy_workspace.hist_mask_sjm[s, j])
                     counts_m = self.ploidy_workspace.counts_m
-                    hist_norm_m = self.ploidy_workspace.hist_sjm_full[s, j] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j] * self.ploidy_workspace.hist_mask_sjm[s, j])
+                    hist_norm_m = self.ploidy_workspace.hist_sjm[s, j] / np.sum(self.ploidy_workspace.hist_sjm[s, j] * self.ploidy_workspace.hist_mask_sjm[s, j])
                     axarr[0].semilogy(counts_m, hist_norm_m, c='k', alpha=0.25)
                     axarr[0].semilogy(counts_m, np.ma.array(hist_norm_m, mask=hist_mask_m), c='b', alpha=0.5)
                     mu = fit_mu_sj[s, j]
@@ -149,14 +151,13 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                     pdf_m = nbinom.pmf(k=counts_m, n=alpha, p=alpha / (mu + alpha))
                     axarr[0].semilogy(counts_m, np.ma.array(pdf_m, mask=hist_mask_m), c='g', lw=2)
                     axarr[0].set_xlim([0, self.ploidy_workspace.num_counts])
-            axarr[0].set_ylim([1 / np.max(np.sum(self.ploidy_workspace.hist_sjm_full[s] * self.ploidy_workspace.hist_mask_sjm[s], axis=-1)), 1E-1])
+            axarr[0].set_ylim([1 / np.max(np.sum(self.ploidy_workspace.hist_sjm[s] * self.ploidy_workspace.hist_mask_sjm[s], axis=-1)), 1E-1])
             axarr[0].set_xlabel('count', size=14)
             axarr[0].set_ylabel('density', size=14)
 
             k_j = [np.argmax(pi_i_sk[i][s])
                    for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples)
                    for j in range(len(contig_tuple))]
-            mu_j = np.array([mu_j_sk[j][s, k_j[j]] for j in range(self.ploidy_workspace.num_contigs)])
 
             j = np.arange(self.ploidy_workspace.num_contigs)
 

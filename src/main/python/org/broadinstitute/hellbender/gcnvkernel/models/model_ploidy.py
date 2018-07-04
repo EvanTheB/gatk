@@ -17,7 +17,7 @@ from .fancy_model import GeneralizedContinuousModel
 from .. import config, types
 from ..structs.interval import Interval
 from ..structs.metadata import IntervalListMetadata, SampleMetadataCollection
-from ..tasks.inference_task_base import HybridInferenceParameters
+from ..tasks.inference_task_base import HybridInferenceParameters, HybridInferenceTask
 
 _logger = logging.getLogger(__name__)
 np.set_printoptions(threshold=np.inf)
@@ -196,25 +196,19 @@ class PloidyWorkspace:
                 self.is_ploidy_in_ploidy_state_j_kl[j][k, ploidy] = 1
 
         # count-distribution data
-        self.hist_sjm_full = np.zeros((self.num_samples, self.num_contigs, self.num_counts), dtype=types.med_uint)
+        self.hist_sjm = np.zeros((self.num_samples, self.num_contigs, self.num_counts), dtype=types.med_uint)
         for si, sample_name in enumerate(self.sample_names):
             sample_metadata = sample_metadata_collection.get_sample_coverage_metadata(sample_name)
             for j, contig in enumerate(self.contigs):
-                self.hist_sjm_full[si, j] = sample_metadata.contig_hist_m[contig]
+                self.hist_sjm[si, j] = sample_metadata.contig_hist_m[contig]
         self.counts_m = np.arange(self.num_counts, dtype=types.med_uint)
 
         # mask for count bins
-        self.hist_mask_sjm = self._construct_mask(self.hist_sjm_full)
-
-        self.fit_mu_sj, self.fit_mu_sd_sj, self.fit_alpha_sj, self.fit_alpha_sd_sj = \
-            self._fit_negative_binomial(self.hist_sjm_full, self.hist_mask_sjm)
+        self.hist_mask_sjm = self._construct_mask(self.hist_sjm)
 
         average_ploidy = 2. # TODO
-        self.d_s_testval = np.median(np.sum(self.hist_sjm_full * self.hist_mask_sjm * self.counts_m, axis=-1) /
-                                     np.sum(self.hist_sjm_full * self.hist_mask_sjm, axis=-1), axis=-1) / average_ploidy
-
-        self.hist_sjm : types.TensorSharedVariable = \
-            th.shared(self.hist_sjm_full, name='hist_sjm', borrow=config.borrow_numpy)
+        self.d_s_testval = np.median(np.sum(self.hist_sjm * self.hist_mask_sjm * self.counts_m, axis=-1) /
+                                     np.sum(self.hist_sjm * self.hist_mask_sjm, axis=-1), axis=-1) / average_ploidy
 
         # ploidy log posteriors (initialize to priors)
         self.log_q_ploidy_sjl: types.TensorSharedVariable = \
@@ -226,34 +220,11 @@ class PloidyWorkspace:
             th.shared(np.zeros((self.num_samples, self.num_contigs, self.num_ploidies), dtype=types.floatX),
                       name='log_ploidy_emission_sjl', borrow=config.borrow_numpy)
 
-        for s in range(self.num_samples):
-            fig, axarr = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw = {'height_ratios':[3, 1]})
-            for i, contig_tuple in enumerate(self.contig_tuples):
-                for contig in contig_tuple:
-                    j = self.contig_to_index_map[contig]
-                    hist_mask_m = np.logical_not(self.hist_mask_sjm[s, j])
-                    counts_m = self.counts_m
-                    hist_norm_m = self.hist_sjm_full[s, j] / np.sum(self.hist_sjm_full[s, j] * self.hist_mask_sjm[s, j])
-                    axarr[0].semilogy(counts_m, hist_norm_m, c='k', alpha=0.25)
-                    axarr[0].semilogy(counts_m, np.ma.array(hist_norm_m, mask=hist_mask_m), c='b', alpha=0.5)
-                    mu = self.fit_mu_sj[s, j]
-                    alpha = self.fit_alpha_sj[s, j]
-                    pdf_m = nbinom.pmf(k=counts_m, n=alpha, p=alpha / (mu + alpha))
-                    axarr[0].semilogy(counts_m, np.ma.array(pdf_m, mask=hist_mask_m), c='g', lw=2)
-                    axarr[0].set_xlim([0, self.num_counts])
-            axarr[0].set_ylim([1 / np.max(np.sum(self.hist_sjm_full[s] * self.hist_mask_sjm[s], axis=-1)), 1E-1])
-            axarr[0].set_xlabel('count', size=14)
-            axarr[0].set_ylabel('density', size=14)
+        self.fit_mu_sj = None
+        self.fit_mu_sd_sj = None
+        self.fit_alpha_sj = None
+        self.fit_alpha_sd_sj = None
 
-            j = np.arange(self.num_contigs)
-
-            axarr[1].set_xticks(j)
-            axarr[1].set_xticklabels(self.contigs)
-            axarr[1].set_xlabel('contig', size=14)
-            axarr[1].set_ylabel('ploidy', size=14)
-
-            fig.tight_layout(pad=0.5)
-            fig.savefig('/home/slee/working/gatk/test_files/plots/sample_{0}.png'.format(s))
 
     @staticmethod
     def _get_contig_set_from_interval_list(interval_list: List[Interval]) -> Set[str]:
@@ -266,85 +237,75 @@ class PloidyWorkspace:
         # mask_sjm[:, :, 1:20] = False
         return mask_sjm
 
-    @staticmethod
-    def _fit_negative_binomial(hist_sjm, hist_mask_sjm):
-        eps = PloidyWorkspace.epsilon
-        alpha_max = 1e5
-        num_advi_iterations = 50000
-        random_seed = 1
-        learning_rate = 0.05
-        abs_tolerance = 0.1
-        num_logq_samples = 1000
-        batch_size_base = 32
 
-        num_samples = hist_sjm.shape[0]
-        num_contigs = hist_sjm.shape[1]
-        num_counts = hist_sjm.shape[2]
+class HistogramModel(GeneralizedContinuousModel):
+    def __init__(self,
+                 ploidy_config: PloidyModelConfig,
+                 ploidy_workspace: PloidyWorkspace):
+        super().__init__()
+        self.ploidy_config = ploidy_config
+        self.ploidy_workspace = ploidy_workspace
+
+        # shorthands
+        num_samples = ploidy_workspace.num_samples
+        num_contigs = ploidy_workspace.num_contigs
+        num_counts = ploidy_workspace.num_counts
+        counts_m = ploidy_workspace.counts_m
+        hist_sjm = ploidy_workspace.hist_sjm
+        hist_mask_sjm = ploidy_workspace.hist_mask_sjm
+        eps = ploidy_workspace.eps
+
+        register_as_sample_specific = self.register_as_sample_specific
+
+        alpha_max = 1e5
+        random_seed = 1
+        batch_size_base = 32
 
         num_occurrences_sj = th.shared(np.sum(hist_sjm * hist_mask_sjm, axis=-1))
 
         batch_size = batch_size_base
-        counts_m = np.arange(num_counts)
         counts_m_batched = pm.Minibatch(counts_m, batch_size=batch_size, random_seed=random_seed)
         hist_sjm_th = th.shared(hist_sjm)
         hist_mask_sjm_th = th.shared(hist_mask_sjm)
 
-        # fit_mu_sj_testval = np.sum(counts_m * hist_sjm, axis=-1) / np.sum(hist_sjm, axis=-1)
-        # fit_std_sj = np.sum((counts_m[np.newaxis, np.newaxis, :] - fit_mu_sj_testval[:, :, np.newaxis])**2 * hist_sjm,
-        #                     axis=-1) / np.sum(hist_sjm, axis=-1)
-        # fit_alpha_sj_testval = fit_mu_sj_testval**2 / (fit_std_sj**2 - fit_mu_sj_testval)
+        fit_mu_sj = Uniform('fit_mu_sj',
+                            upper=num_counts,
+                            shape=(num_samples, num_contigs))
+        register_as_sample_specific(fit_mu_sj, sample_axis=0)
 
-        # batch_size = batch_size_base * num_samples
-        # hist_mask_indices = np.where(hist_mask_sjm)
-        # hist_mask_indices_batched = pm.Minibatch(np.transpose(hist_mask_indices),
-        #                                          batch_size=batch_size,
-        #                                          random_seed=random_seed)
+        fit_alpha_sj = Uniform('fit_alpha_sj',
+                               upper=alpha_max,
+                               shape=(num_samples, num_contigs))
+        register_as_sample_specific(fit_alpha_sj, sample_axis=0)
 
-        with pm.Model() as model:
-            fit_mu_sj = Uniform('fit_mu_sj',
-                                upper=num_counts,
-                                shape=(num_samples, num_contigs))
-                                # testval=fit_mu_sj_testval)
-            fit_alpha_sj = Uniform('fit_alpha_sj',
-                                   upper=alpha_max,
-                                   shape=(num_samples, num_contigs))
-                                   # testval=fit_alpha_sj_testval)
-            # p_sjm = tt.exp(negative_binomial_logp(mu=fit_mu_sj.dimshuffle(0, 1, 'x') + eps,
-            #                                       alpha=fit_alpha_sj.dimshuffle(0, 1, 'x'),
-            #                                       value=counts_m[np.newaxis, np.newaxis, :],
-            #                                       mask=hist_mask_sjm))
-            # def logp(hist_sjm):
-            #     return tt.sum(poisson_logp(mu=num_occurrences_sj[:, :, np.newaxis] * p_sjm + eps,
-            #                                value=hist_sjm,
-            #                                mask=hist_mask_sjm))
-            p_sjm = tt.exp(negative_binomial_logp(mu=fit_mu_sj.dimshuffle(0, 1, 'x') + eps,
-                                                  alpha=fit_alpha_sj.dimshuffle(0, 1, 'x'),
-                                                  value=counts_m_batched[np.newaxis, np.newaxis, :],
-                                                  mask=hist_mask_sjm_th[:, :, counts_m_batched]))
-            pm.Potential(name='logp_hist_sjm',
-                         var=tt.sum(poisson_logp(mu=num_occurrences_sj[:, :, np.newaxis] * p_sjm + eps,
-                                                 value=hist_sjm_th[:, :, counts_m_batched],
-                                                 mask=hist_mask_sjm_th[:, :, counts_m_batched])))
-            # def logp(hist_sjm):
-            #     s = hist_mask_indices_batched[:, 0]
-            #     j = hist_mask_indices_batched[:, 1]
-            #     m = hist_mask_indices_batched[:, 2]
-            #     fit_mu_b = fit_mu_sj[s, j]
-            #     fit_alpha_b = fit_alpha_sj[s, j]
-            #     num_occurrences_b = num_occurrences_sj[s, j]
-            #     p_b = tt.exp(negative_binomial_logp(mu=fit_mu_b + eps,
-            #                                         alpha=fit_alpha_b,
-            #                                         value=m))
-            #     hist_b = hist_sjm[s, j, m]
-            #     return tt.sum(poisson_logp(mu=num_occurrences_b * p_b + eps,
-            #                                value=hist_b))
+        p_sjm = tt.exp(negative_binomial_logp(mu=fit_mu_sj.dimshuffle(0, 1, 'x') + eps,
+                                              alpha=fit_alpha_sj.dimshuffle(0, 1, 'x'),
+                                              value=counts_m_batched[np.newaxis, np.newaxis, :],
+                                              mask=hist_mask_sjm_th[:, :, counts_m_batched]))
 
-        _logger.info("Fitting count distributions...")
-        approx = pm.fit(n=num_advi_iterations, model=model, random_seed=random_seed,
-                        obj_optimizer=pm.adamax(learning_rate=learning_rate),
-                        callbacks=[pm.callbacks.CheckParametersConvergence(tolerance=abs_tolerance, diff='absolute')])
+        pm.Potential(name='logp_hist_sjm',
+                     var=tt.sum(poisson_logp(mu=num_occurrences_sj[:, :, np.newaxis] * p_sjm + eps,
+                                             value=hist_sjm_th[:, :, counts_m_batched],
+                                             mask=hist_mask_sjm_th[:, :, counts_m_batched])))
 
-        trace = approx.sample(num_logq_samples)
+class HistogramInferenceTask(HybridInferenceTask):
+    def __init__(self,
+                 hybrid_inference_params: HybridInferenceParameters,
+                 ploidy_config: PloidyModelConfig,
+                 ploidy_workspace: PloidyWorkspace):
+        _logger.info("Instantiating the histogram model...")
+        self.histogram_model = HistogramModel(ploidy_config, ploidy_workspace)
+
+        elbo_normalization_factor = ploidy_workspace.num_samples * ploidy_workspace.num_contigs
+        super().__init__(hybrid_inference_params, self.histogram_model, None, None,
+                         elbo_normalization_factor=elbo_normalization_factor,
+                         advi_task_name="histogram fitting")
+
+        self.ploidy_config = ploidy_config
+        self.ploidy_workspace = ploidy_workspace
+
+    def disengage(self):
+        trace = self.continuous_model_approx.sample(1000)
 
         fit_mu_sj = np.mean(trace['fit_mu_sj'], axis=0)
         fit_mu_sd_sj = np.std(trace['fit_mu_sj'], axis=0)
@@ -354,13 +315,41 @@ class PloidyWorkspace:
         print(fit_mu_sj)
         print(fit_alpha_sj)
 
-        return fit_mu_sj, fit_mu_sd_sj, fit_alpha_sj, fit_alpha_sd_sj
+        for s in range(self.ploidy_workspace.num_samples):
+            fig, axarr = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw = {'height_ratios':[3, 1]})
+            for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples):
+                for contig in contig_tuple:
+                    j = self.ploidy_workspace.contig_to_index_map[contig]
+                    hist_mask_m = np.logical_not(self.ploidy_workspace.hist_mask_sjm[s, j])
+                    counts_m = self.ploidy_workspace.counts_m
+                    hist_norm_m = self.ploidy_workspace.hist_sjm[s, j] / np.sum(self.ploidy_workspace.hist_sjm[s, j] * self.ploidy_workspace.hist_mask_sjm[s, j])
+                    axarr[0].semilogy(counts_m, hist_norm_m, c='k', alpha=0.25)
+                    axarr[0].semilogy(counts_m, np.ma.array(hist_norm_m, mask=hist_mask_m), c='b', alpha=0.5)
+                    mu = fit_mu_sj[s, j]
+                    alpha = fit_alpha_sj[s, j]
+                    pdf_m = nbinom.pmf(k=counts_m, n=alpha, p=alpha / (mu + alpha))
+                    axarr[0].semilogy(counts_m, np.ma.array(pdf_m, mask=hist_mask_m), c='g', lw=2)
+                    axarr[0].set_xlim([0, self.ploidy_workspace.num_counts])
+            axarr[0].set_ylim([1 / np.max(np.sum(self.ploidy_workspace.hist_sjm[s] * self.ploidy_workspace.hist_mask_sjm[s], axis=-1)), 1E-1])
+            axarr[0].set_xlabel('count', size=14)
+            axarr[0].set_ylabel('density', size=14)
 
+            j = np.arange(self.ploidy_workspace.num_contigs)
+
+            axarr[1].set_xticks(j)
+            axarr[1].set_xticklabels(self.ploidy_workspace.contigs)
+            axarr[1].set_xlabel('contig', size=14)
+            axarr[1].set_ylabel('ploidy', size=14)
+
+            fig.tight_layout(pad=0.5)
+            fig.savefig('/home/slee/working/gatk/test_files/plots/sample_{0}.png'.format(s))
+
+        self.ploidy_workspace.fit_mu_sj = fit_mu_sj
+        self.ploidy_workspace.fit_mu_sd_sj = fit_mu_sd_sj
+        self.ploidy_workspace.fit_alpha_sj = fit_alpha_sj
+        self.ploidy_workspace.fit_alpha_sd_sj = fit_alpha_sd_sj
 
 class PloidyModel(GeneralizedContinuousModel):
-    """Declaration of the germline contig ploidy model (continuous variables only; posterior of discrete
-    variables are assumed to be known)."""
-
     def __init__(self,
                  ploidy_config: PloidyModelConfig,
                  ploidy_workspace: PloidyWorkspace):
