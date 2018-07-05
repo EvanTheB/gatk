@@ -705,9 +705,9 @@ public final class MathUtils {
         if(maxValue == Double.NEGATIVE_INFINITY) {
             return maxValue;
         }
-        final double sum = 1.0 + new IndexRange(start, finish).sum(i -> i == maxElementIndex ? 0 : Math.pow(10.0, log10p[i] - maxValue));
+        final double sum = new IndexRange(start, finish).sum(i -> i == maxElementIndex ? 0 : Math.pow(10.0, log10p[i] - maxValue));
         Utils.validateArg(!Double.isNaN(sum) && sum != Double.POSITIVE_INFINITY, "log10p values must be non-infinite and non-NAN");
-        return maxValue + Math.log10(sum);
+        return maxValue + Math.log1p(sum) / Math.log(10.0);
     }
 
 
